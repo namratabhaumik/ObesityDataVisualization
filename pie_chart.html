@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pie Chart: Overweight and Obese Proportion</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      .tooltip {
+        position: absolute;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px;
+        border-radius: 5px;
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      .legend {
+        position: absolute;
+        top: 30px;
+        left: 30px;
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin-right: 10px;
+      }
+
+      .legend-item-color {
+        width: 20px;
+        height: 20px;
+        margin-right: 5px;
+      }
+
+      .chart-title {
+        font-size: 18px;
+        font-weight: bold;
+        text-anchor: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="pie-chart"></div>
+
+    <script>
+      // Load the JSON data
+      d3.json("2022_data.json").then(function (data) {
+        // Calculate proportions
+        const overweightProportion = data.overweight_percentage / 100;
+        const obeseProportion = data.obese_percentage / 100;
+
+        // Define data for pie chart
+        const pieData = [
+          { label: "Overweight", value: overweightProportion },
+          { label: "Obese", value: obeseProportion },
+        ];
+
+        // Define dimensions for the pie chart
+        const width = 400;
+        const height = 200;
+        const radius = Math.min(width, height) / 2;
+
+        // Define color scale
+        const color = d3
+          .scaleOrdinal()
+          .domain(pieData.map((d) => d.label))
+          .range(["#ff7f0e", "#1f77b4"]);
+
+        // Define arc generator
+        const arc = d3.arc().innerRadius(0).outerRadius(radius);
+
+        // Create SVG element
+        const svg = d3
+          .select("#pie-chart")
+          .append("svg")
+          .attr("width", width + 100)
+          .attr("height", height + 200)
+          .append("g")
+          .attr("transform", `translate(${width / 2 + 50},${height / 2 + 50})`);
+
+        // Add title
+        svg
+          .append("text")
+          .attr("class", "chart-title")
+          .attr("x", 0)
+          .attr("y", -height / 2 - 20)
+          .text("Pie Chart: Overweight and Obese Proportion");
+
+        // Create pie chart
+        const pie = d3
+          .pie()
+          .sort(null)
+          .value((d) => d.value);
+
+        // Append arcs
+        const arcs = svg
+          .selectAll("arc")
+          .data(pie(pieData))
+          .enter()
+          .append("g")
+          .attr("class", "arc")
+          .on("mouseover", handleMouseOver)
+          .on("mouseout", handleMouseOut);
+
+        arcs
+          .append("path")
+          .attr("d", arc)
+          .attr("fill", (d) => color(d.data.label))
+          .style("cursor", "pointer");
+
+        // Tooltip
+        const tooltip = d3
+          .select("#pie-chart")
+          .append("div")
+          .attr("class", "tooltip")
+          .style("opacity", 0);
+
+        function handleMouseOver(event, d) {
+          d3.select(this)
+            .select("path")
+            .transition()
+            .duration(200)
+            .attr(
+              "d",
+              d3
+                .arc()
+                .innerRadius(0)
+                .outerRadius(radius + 10)
+            );
+
+          tooltip.transition().duration(200).style("opacity", 0.9);
+          tooltip
+            .html(`${d.data.label}: ${(d.data.value * 100).toFixed(2)}%`)
+            .style("left", event.pageX + "px")
+            .style("top", event.pageY - 28 + "px");
+        }
+
+        function handleMouseOut(event, d) {
+          d3.select(this)
+            .select("path")
+            .transition()
+            .duration(200)
+            .attr("d", arc);
+
+          tooltip.transition().duration(500).style("opacity", 0);
+        }
+
+        // Create legend
+        const legend = svg
+          .append("g")
+          .attr("class", "legend")
+          .attr("transform", "translate(120, 30)");
+
+        const legendItems = legend
+          .selectAll(".legend-item")
+          .data(pieData)
+          .enter()
+          .append("g")
+          .attr("class", "legend-item")
+          .attr("transform", (d, i) => `translate(0, ${i * 30})`);
+
+        legendItems
+          .append("rect")
+          .attr("class", "legend-item-color")
+          .attr("width", 20)
+          .attr("height", 20)
+          .attr("fill", (d) => color(d.label));
+
+        legendItems
+          .append("text")
+          .text((d) => d.label)
+          .attr("x", 25)
+          .attr("y", 15)
+          .attr("fill", "black");
+      });
+    </script>
+  </body>
+</html>

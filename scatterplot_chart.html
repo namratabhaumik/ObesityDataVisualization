@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Scatter Plot</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      .dot {
+        fill: steelblue;
+        stroke: #fff;
+      }
+
+      .dot:hover {
+        fill: orange;
+        stroke-width: 2;
+      }
+
+      .legend {
+        font-size: 14px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin-right: 10px;
+      }
+
+      .legend-item-color {
+        width: 20px;
+        height: 20px;
+        margin-right: 5px;
+      }
+
+      .chart-title {
+        font-size: 18px;
+        font-weight: bold;
+        text-anchor: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <svg id="scatterplot" width="400" height="350"></svg>
+
+    <script>
+      // Load data
+      d3.csv("open_gov_ca_age_sex.csv").then(function (data) {
+        // Data processing
+        data.forEach(function (d) {
+          d.AgeGroup = d["Age group"];
+          d.Sex = d.Sex;
+          if (d.UOM === "Percentage") {
+            d.OverweightObesityLevel = +d.VALUE / 100;
+          } else {
+            d.OverweightObesityLevel = +d.VALUE;
+          }
+        });
+
+        var svg = d3.select("#scatterplot"),
+          margin = { top: 70, right: 0, bottom: 60, left: 90 },
+          width = +svg.attr("width") - margin.left - margin.right,
+          height = +svg.attr("height") - margin.top - margin.bottom,
+          g = svg
+            .append("g")
+            .attr(
+              "transform",
+              "translate(" + margin.left + "," + margin.top + ")"
+            );
+
+        // Define scales
+        var x = d3
+          .scaleBand()
+          .domain(
+            data.map(function (d) {
+              return d.AgeGroup;
+            })
+          )
+          .range([0, width])
+          .padding(0.1);
+
+        var y = d3
+          .scaleLinear()
+          .domain([
+            0,
+            d3.max(data, function (d) {
+              return d.OverweightObesityLevel;
+            }),
+          ])
+          .range([height, 0]);
+
+        var color = d3
+          .scaleOrdinal()
+          .domain(["Both Sexes", "Males", "Females"])
+          .range(["steelblue", "orange", "green"]);
+
+        // Draw dots
+        g.selectAll(".dot")
+          .data(data)
+          .enter()
+          .append("circle")
+          .attr("class", "dot")
+          .attr("cx", function (d) {
+            return x(d.AgeGroup) + x.bandwidth() / 2;
+          })
+          .attr("cy", function (d) {
+            return y(d.OverweightObesityLevel);
+          })
+          .attr("r", 2)
+          .style("fill", function (d) {
+            return color(d.Sex);
+          });
+
+        // Add X axis
+        g.append("g")
+          .attr("transform", "translate(0," + height + ")")
+          .call(
+            d3.axisBottom(x).tickFormat(function (d) {
+              return d.replace("Ages ", "").replace(" to ", "-");
+            })
+          )
+          .selectAll("text")
+          .style("text-anchor", "end")
+          .attr("dx", "-0.5em")
+          .attr("dy", "0.5em")
+          .attr("transform", "rotate(-45)");
+
+        // Add Y axis
+        g.append("g").call(d3.axisLeft(y));
+
+        // Add X axis label
+        g.append("text")
+          .attr("text-anchor", "end")
+          .attr("x", width - 100)
+          .attr("y", height + 50)
+          .text("Age Group");
+
+        // Add Y axis label
+        g.append("text")
+          .attr("text-anchor", "end")
+          .attr("transform", "rotate(-90)")
+          .attr("y", -margin.left + 20)
+          .attr("x", -margin.top + 70)
+          .text("Overweight and Obesity Levels");
+
+        // Add title
+        svg
+          .append("text")
+          .attr("class", "chart-title")
+          .attr("x", width / 2 + 50)
+          .attr("y", margin.top / 2)
+          .append("tspan")
+          .attr("x", width / 2 + 50)
+          .text("Scatterplot: Overweight and Obesity Levels")
+          .append("tspan")
+          .attr("x", width / 2 + 50)
+          .attr("dy", "1.2em")
+          .text("Across Age Groups and Sexes");
+
+        // Add tooltip
+        var tooltip = d3
+          .select("body")
+          .append("div")
+          .attr("class", "tooltip")
+          .style("opacity", 0);
+
+        // Show tooltip on hover
+        svg
+          .selectAll(".dot")
+          .on("mouseover", function () {
+            var d = this.__data__;
+            var mouseX = d3.pointer(event)[0];
+            var mouseY = d3.pointer(event)[1];
+            tooltip.transition().duration(200).style("opacity", 0.9);
+            tooltip
+              .html(
+                "Age Group: " +
+                  d.AgeGroup +
+                  "<br/>" +
+                  "Sex: " +
+                  d.Sex +
+                  "<br/>" +
+                  "Overweight and Obesity Level: " +
+                  d.OverweightObesityLevel
+              )
+              .style("left", mouseX + "px")
+              .style("top", mouseY - 28 + "px");
+          })
+          .on("mouseout", function (d) {
+            tooltip.transition().duration(500).style("opacity", 0);
+          });
+
+        // Create legend
+        var legend = svg
+          .append("g")
+          .attr("class", "legend")
+          .attr("transform", "translate(300,70)");
+
+        var legendItems = legend
+          .selectAll(".legend-item")
+          .data(["Both Sexes", "Males", "Females"])
+          .enter()
+          .append("g")
+          .attr("class", "legend-item")
+          .attr("transform", function (d, i) {
+            return "translate(0," + i * 20 + ")";
+          });
+
+        legendItems
+          .append("rect")
+          .attr("class", "legend-item-color")
+          .attr("width", 20)
+          .attr("height", 20)
+          .attr("fill", function (d) {
+            return color(d);
+          });
+
+        legendItems
+          .append("text")
+          .text(function (d) {
+            return d;
+          })
+          .attr("x", 25)
+          .attr("y", 15)
+          .attr("fill", "black");
+
+        legendItems.each(function (sex) {
+          var checkbox = d3
+            .select(this)
+            .append("foreignObject")
+            .attr("width", 130)
+            .attr("height", 50)
+            .attr("x", -8)
+            .attr("y", -8)
+            .append("xhtml:body")
+            .html('<input type="checkbox" class="checkbox" checked/>')
+            .on("click", function () {
+              var isChecked = d3
+                .select(this)
+                .select(".checkbox")
+                .property("checked");
+              var selectedDots = svg.selectAll(".dot");
+              if (isChecked) {
+                if (sex === "Both Sexes") {
+                  selectedDots
+                    .filter(function (d) {
+                      return d.Sex === "Both Sexes";
+                    })
+                    .style("display", "initial");
+                } else {
+                  selectedDots
+                    .filter(function (d) {
+                      return d.Sex === sex;
+                    })
+                    .style("display", "initial");
+                }
+              } else {
+                if (sex === "Both Sexes") {
+                  selectedDots
+                    .filter(function (d) {
+                      return d.Sex === "Both Sexes";
+                    })
+                    .style("display", "none");
+                } else {
+                  selectedDots
+                    .filter(function (d) {
+                      return d.Sex === sex;
+                    })
+                    .style("display", "none");
+                }
+              }
+            });
+        });
+      });
+    </script>
+  </body>
+</html>

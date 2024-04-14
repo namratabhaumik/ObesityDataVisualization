@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Heatmap: Overweight and Obesity Levels</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      .cell {
+        fill: steelblue;
+        stroke: white;
+      }
+      .cell:hover {
+        fill: orange;
+      }
+      .tooltip {
+        position: absolute;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px;
+        border-radius: 5px;
+        pointer-events: none;
+        opacity: 0;
+      }
+      .chart-title {
+        font-size: 18px;
+        font-weight: bold;
+        text-anchor: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <svg id="heatmap" width="500" height="300"></svg>
+
+    <script>
+      const svg = d3.select("#heatmap");
+      const margin = { top: 50, right: 120, bottom: 50, left: 80 };
+      const width = +svg.attr("width") - margin.left - margin.right;
+      const height = +svg.attr("height") - margin.top - margin.bottom;
+      const g = svg
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+      const dataURL = "open_gov_ca_age_sex.csv";
+
+      // Load data
+      d3.csv(dataURL).then(function (data) {
+        // Process data
+        data.forEach(function (d) {
+          d.AgeGroup = d["Age group"];
+          d.Sex = d.Sex;
+          d.ObesityRate = convertObesityRate(d.VALUE, d.UOM);
+        });
+
+        // Define scales
+        const xScale = d3
+          .scaleBand()
+          .domain(
+            data.map((d) =>
+              d.AgeGroup.replace("Ages ", "").replace(" to ", "-")
+            )
+          )
+          .range([0, width])
+          .padding(0.1);
+
+        const yScale = d3
+          .scaleBand()
+          .domain(data.map((d) => d.Sex))
+          .range([height, 0])
+          .padding(0.1);
+
+        const colorScale = d3
+          .scaleSequential(d3.interpolateBlues)
+          .domain([0, d3.max(data, (d) => convertObesityRate(d.VALUE, d.UOM))]);
+
+        // Draw cells
+        const cells = g
+          .selectAll(".cell")
+          .data(data)
+          .enter()
+          .append("rect")
+          .attr("class", "cell")
+          .attr("x", (d) =>
+            xScale(d.AgeGroup.replace("Ages ", "").replace(" to ", "-"))
+          )
+          .attr("y", (d) => yScale(d.Sex))
+          .attr("width", xScale.bandwidth())
+          .attr("height", yScale.bandwidth())
+          .style("fill", (d) => colorScale(d.ObesityRate))
+          .on("mouseover", handleMouseOver)
+          .on("mouseout", handleMouseOut);
+
+        // Add X axis
+        g.append("g")
+          .attr("transform", `translate(0,${height})`)
+          .call(d3.axisBottom(xScale));
+
+        // Add Y axis
+        g.append("g").call(d3.axisLeft(yScale));
+
+        // Add X axis label
+        g.append("text")
+          .attr(
+            "transform",
+            `translate(${width / 2},${height + margin.top - 10})`
+          )
+          .style("text-anchor", "middle")
+          .text("Age Group");
+
+        // Add Y axis label
+        g.append("text")
+          .attr("transform", "rotate(-90)")
+          .attr("y", -margin.left + 10)
+          .attr("x", -height / 2)
+          .style("text-anchor", "middle")
+          .text("Sex");
+
+        // Add title
+        svg
+          .append("text")
+          .attr("class", "chart-title")
+          .attr("x", width / 2 + margin.left)
+          .attr("y", margin.top / 2)
+          .text("Heatmap: Overweight and Obesity Levels");
+
+        // Add color legend
+        const legend = svg
+          .append("g")
+          .attr(
+            "transform",
+            `translate(${width + margin.left + 20},${margin.top})`
+          );
+
+        const legendTitle = legend
+          .append("text")
+          .attr("x", 0)
+          .attr("y", -10)
+          .text("Obesity Rate");
+
+        const legendGradient = legend
+          .append("defs")
+          .append("linearGradient")
+          .attr("id", "legend-gradient")
+          .attr("x1", "0%")
+          .attr("y1", "0%")
+          .attr("x2", "0%")
+          .attr("y2", "100%");
+
+        legendGradient
+          .append("stop")
+          .attr("offset", "0%")
+          .attr("stop-color", colorScale.range()[0]);
+
+        legendGradient
+          .append("stop")
+          .attr("offset", "100%")
+          .attr("stop-color", colorScale.range()[1]);
+
+        legend
+          .append("rect")
+          .attr("x", 0)
+          .attr("y", 0)
+          .attr("width", 20)
+          .attr("height", height)
+          .style("fill", "url(#legend-gradient)");
+
+        const legendAxis = d3
+          .axisRight(colorScale)
+          .tickSize(6)
+          .tickValues(
+            colorScale
+              .domain()
+              .filter((d, i) => i === 0 || i === colorScale.domain().length - 1)
+          );
+
+        var legendGroup = legend
+          .append("g")
+          .attr("transform", "translate(20, 0)")
+          .call(legendAxis);
+
+        // Adjust the tick positions and lines
+        legendGroup.selectAll(".tick").attr("transform", function (d) {
+          return d === colorScale.domain()[0]
+            ? "translate(0, 0)"
+            : "translate(0, 200)";
+        });
+
+        legendGroup.selectAll(".tick line").attr("y2", function (d) {
+          return d === colorScale.domain()[0] ? 0 : 0;
+        });
+
+        // Tooltip
+        const tooltip = d3
+          .select("body")
+          .append("div")
+          .attr("class", "tooltip")
+          .style("opacity", 0);
+
+        function handleMouseOver(event, d) {
+          d3.select(this).style("fill", "lightblue");
+          tooltip.transition().duration(200).style("opacity", 0.9);
+          tooltip
+            .html(
+              `Age Group: ${d.AgeGroup}<br>Sex: ${
+                d.Sex
+              }<br>Obesity Rate: ${convertObesityRate(d.VALUE, d.UOM)}`
+            )
+            .style("left", event.pageX + "px")
+            .style("top", event.pageY - 28 + "px");
+        }
+
+        function handleMouseOut(d) {
+          d3.select(this).style("fill", (d) => colorScale(d.ObesityRate));
+          tooltip.transition().duration(500).style("opacity", 0);
+        }
+      });
+
+      function convertObesityRate(value, uom) {
+        if (uom === "Percentage") {
+          // Convert percentage to decimal
+          return parseFloat(value) / 100;
+        } else {
+          return parseFloat(value);
+        }
+      }
+    </script>
+  </body>
+</html>

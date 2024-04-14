@@ -1,0 +1,8 @@
+{
+  "year": 2022,
+  "population": 10000000,
+  "overweight_population": 10000000,
+  "obese_population": 8700000,
+  "overweight_percentage": 35,
+  "obese_percentage": 30
+}

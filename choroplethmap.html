@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Choropleth Map of Obesity Rates in Canada</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow-y: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+
+      body::-webkit-scrollbar {
+        display: none;
+      }
+
+      #map-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .tooltip {
+        position: fixed;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px;
+        border-radius: 5px;
+        pointer-events: none;
+        opacity: 0;
+        max-width: 200px;
+        z-index: 9999;
+      }
+
+      header {
+        background-color: #f0f0f0;
+        padding: 10px;
+        position: fixed;
+        width: 100%;
+        z-index: 999;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      nav ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      nav ul li {
+        display: inline;
+        margin-right: 10px;
+      }
+
+      nav ul li a {
+        text-decoration: none;
+        color: #333;
+      }
+
+      nav ul li a.active {
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <h1>Choropleth Map of Obesity Rates in Canada</h1>
+        <nav>
+          <ul>
+            <li><a href="integrated.html">Home</a></li>
+            <li><a href="visualizations.html">Visualizations</a></li>
+            <li><a href="choroplethmap.html" class="active">Map</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <div id="map-container">
+      <svg id="map" width="800" height="600"></svg>
+    </div>
+
+    <script>
+      // Load the canada.geojson file
+      d3.json("canada.geojson").then(function (geojson) {
+        // Load the obesity data
+        d3.csv("obesity_by_province_data.csv").then(function (data) {
+          // Convert obesity rate values to numbers
+          data.forEach(function (d) {
+            d["Obesity Rate"] = convertObesityRate(d["Obesity Rate"], d.UOM);
+          });
+
+          var svg = d3.select("#map");
+
+          // Define the projection
+          var projection = d3.geoMercator().fitSize([800, 600], geojson);
+
+          // Define the path generator
+          var path = d3.geoPath().projection(projection);
+
+          // Define color scale for obesity rates
+          var colorScale = d3.scaleSequential(d3.interpolateBlues).domain([
+            0,
+            d3.max(data, function (d) {
+              return +d["Obesity Rate"];
+            }),
+          ]);
+
+          // Draw the map
+          svg
+            .selectAll("path")
+            .data(geojson.features)
+            .enter()
+            .append("path")
+            .attr("d", path)
+            .style("fill", function (d) {
+              var provinceData = data.find(function (province) {
+                return province.Province === d.properties.name;
+              });
+
+              return provinceData
+                ? colorScale(provinceData["Obesity Rate"])
+                : "grey";
+            })
+            .on("mouseover", function (event, d) {
+              d3.select(this).style("stroke", "black").style("stroke-width", 2);
+
+              var provinceData = data.find(function (province) {
+                return province.Province === d.properties.name;
+              });
+
+              // Show tooltip
+              tooltip.transition().duration(200).style("opacity", 0.9);
+              tooltip
+                .html(
+                  "<strong>Province:</strong> " +
+                    d.properties.name +
+                    "<br><strong>Obesity Rate:</strong> " +
+                    (provinceData
+                      ? provinceData["Obesity Rate"].toFixed(2) + "%"
+                      : "Data not available")
+                )
+                .style("transform", "translate(300px, -500px)");
+            })
+            .on("mouseout", function () {
+              d3.select(this).style("stroke", null).style("stroke-width", null);
+              tooltip.transition().duration(500).style("opacity", 0);
+            });
+
+          // Add province names
+          svg
+            .selectAll("text")
+            .data(geojson.features)
+            .enter()
+            .append("text")
+            .attr("x", function (d) {
+              return path.centroid(d)[0];
+            })
+            .attr("y", function (d) {
+              return path.centroid(d)[1];
+            })
+            .attr("dy", ".35em")
+            .style("text-anchor", "middle")
+            .attr("font-size", "10px")
+            .attr("fill", "brown")
+            .text(function (d) {
+              return d.properties.name;
+            });
+
+          var tooltip = d3
+            .select("body")
+            .append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+
+          // Add legend
+          var legend = svg
+            .append("g")
+            .attr("class", "legend")
+            .attr("transform", "translate(20, 20)");
+
+          var legendTitle = legend
+            .append("text")
+            .attr("x", 0)
+            .attr("y", -10)
+            .text("Obesity Rate");
+
+          var legendGradient = legend
+            .append("defs")
+            .append("linearGradient")
+            .attr("id", "legend-gradient");
+
+          legendGradient
+            .append("stop")
+            .attr("offset", "0%")
+            .attr("stop-color", colorScale.range()[0]);
+
+          legendGradient
+            .append("stop")
+            .attr("offset", "100%")
+            .attr("stop-color", colorScale.range()[1]);
+
+          legend
+            .append("rect")
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("width", 100)
+            .attr("height", 10)
+            .style("fill", "url(#legend-gradient)");
+
+          var legendAxis = d3
+            .axisBottom(d3.scaleLinear().domain(colorScale.domain()))
+            .tickSize(6)
+            .tickValues([colorScale.domain()[0], colorScale.domain()[1]])
+            .tickFormat(d3.format(".1f"));
+
+          var legendGroup = legend
+            .append("g")
+            .attr("transform", "translate(0, 15)")
+            .call(legendAxis);
+
+          legendGroup.selectAll(".tick").attr("transform", function (d) {
+            return d === colorScale.domain()[0]
+              ? "translate(0, 0)"
+              : "translate(100, 0)";
+          });
+
+          legendGroup.selectAll(".tick line").attr("x2", function (d) {
+            return d === colorScale.domain()[0] ? 0 : 0;
+          });
+        });
+      });
+
+      function convertObesityRate(value, uom) {
+        if (uom === "Percentage") {
+          return parseFloat(value) / 100;
+        } else {
+          return parseFloat(value);
+        }
+      }
+    </script>
+  </body>
+</html>

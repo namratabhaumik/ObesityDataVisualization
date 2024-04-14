@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bar Chart: Overweight and Obesity Trends in Canada</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      .chart-title {
+        font-size: 18px;
+        font-weight: bold;
+        text-anchor: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <svg id="visualization" width="500" height="380"></svg>
+
+    <script>
+      const svg = d3.select("#visualization");
+      const totalWidth = +svg.attr("width");
+      const totalHeight = +svg.attr("height");
+
+      // Define margins for bar chart
+      const marginBar = { top: 50, right: 0, bottom: 45, left: 80 };
+
+      const widthBar = totalWidth / 2 - marginBar.left - marginBar.right;
+      const height = totalHeight - marginBar.top - marginBar.bottom;
+
+      const barChartGroup = svg
+        .append("g")
+        .attr("transform", `translate(100, 50)`);
+
+      d3.csv("open_gov_ca_age_sex.csv").then((data) => {
+        // Data processing
+        data.forEach((d) => {
+          d.REF_DATE = new Date(d.REF_DATE);
+          d.VALUE = convertObesityRate(+d.VALUE, d.UOM); // Convert obesity rate values
+        });
+
+        // X and Y scales for bar chart
+        const xBar = d3
+          .scaleBand()
+          .domain(data.map((d) => new Date(d.REF_DATE).getFullYear()))
+          .range([0, widthBar])
+          .padding(0.1);
+        const yBar = d3
+          .scaleLinear()
+          .domain([0, d3.max(data, (d) => +d.VALUE)])
+          .nice()
+          .range([height, 0]);
+
+        // Draw bar chart
+        barChartGroup
+          .selectAll(".bar")
+          .data(data)
+          .enter()
+          .append("rect")
+          .attr("class", "bar")
+          .attr("x", (d) => xBar(new Date(d.REF_DATE).getFullYear()))
+          .attr("y", (d) => yBar(+d.VALUE))
+          .attr("width", xBar.bandwidth())
+          .attr("height", (d) => height - yBar(+d.VALUE))
+          .attr("fill", "orange")
+          .on("mouseover", handleMouseOver)
+          .on("mouseout", handleMouseOut);
+
+        // X axis for bar chart
+        const xAxisBar = d3.axisBottom(xBar);
+        barChartGroup
+          .append("g")
+          .attr("transform", `translate(0,${height})`)
+          .call(xAxisBar)
+          .selectAll("text")
+          .style("text-anchor", "end")
+          .attr("dx", "-.8em")
+          .attr("dy", ".15em")
+          .attr("transform", "rotate(-65)");
+
+        // Update x-axis tick format to display only years
+        xAxisBar.tickFormat(d3.format("d"));
+
+        // Y axis for bar chart
+        barChartGroup
+          .append("g")
+          .call(d3.axisLeft(yBar).ticks(5).tickSize(0).tickPadding(10));
+
+        // Y axis label for bar chart
+        barChartGroup
+          .append("text")
+          .attr("text-anchor", "middle")
+          .attr("transform", "rotate(-90)")
+          .attr("y", -marginBar.left + 10)
+          .attr("x", -height / 2)
+          .text("Value");
+
+        // X axis label for bar chart
+        barChartGroup
+          .append("text")
+          .attr("text-anchor", "middle")
+          .attr(
+            "transform",
+            `translate(${widthBar / 2}, ${height + marginBar.bottom})`
+          )
+          .text("Year");
+      });
+
+      // Function to convert obesity rate values
+      function convertObesityRate(value, uom) {
+        if (uom === "Percentage") {
+          // Convert percentage to decimal
+          return parseFloat(value) / 100;
+        } else {
+          return parseFloat(value);
+        }
+      }
+
+      // Function to handle mouseover event
+      function handleMouseOver(event, d) {
+        d3.select(this).attr("fill", "red");
+      }
+
+      // Function to handle mouseout event
+      function handleMouseOut(event, d) {
+        d3.select(this).attr("fill", "orange");
+      }
+
+      // Add title
+      barChartGroup
+        .append("text")
+        .attr("class", "chart-title")
+        .attr("x", widthBar / 2 + 50)
+        .attr("y", marginBar.top - 70)
+        .text("Bar Chart: Overweight and Obesity Trends in Canada");
+    </script>
+  </body>
+</html>
