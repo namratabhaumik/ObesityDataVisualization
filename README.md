@@ -4,6 +4,10 @@
 
 This project aims to visualize obesity rates and trends across various demographics in Canada using different types of charts and maps. The visualizations include bar charts, pie charts, scatterplots, heatmaps, and a choropleth map.
 
+## Medium Link
+
+[Discovering Insights: Exploring Obesity Trends in Canada](https://namrata-bhaumik.medium.com/discovering-insights-exploring-obesity-trends-in-canada-a3ab3418fb5e?source=friends_link&sk=61c7527ceba438998f1d9710826d8ac7)
+
 ## Getting Started
 
 To run the project locally on your machine, follow these steps:
